@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>檸檬島採集日記</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#bfeee6;--ink:#17414a;--card:#fffdf4;--acc:#f5b800;--line:#17414a33;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f2a30;--ink:#e8f7f3;--card:#173840;--acc:#ffd23f;--line:#e8f7f344;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f2a30;--ink:#e8f7f3;--card:#173840;--acc:#ffd23f;--line:#e8f7f344;color-scheme:dark}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Zen Maru Gothic","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0}
+#hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+#hud>*{pointer-events:auto;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:999px;padding:8px 16px;font:900 16px inherit;font-family:inherit}
+#hud button{cursor:pointer}
+#sc.pop{animation:pop .3s}
+@keyframes pop{50%{transform:scale(1.15)}}
+#menu,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--bg);padding:20px;text-align:center}
+#win{display:none;background:color-mix(in srgb,var(--bg) 88%,transparent)}
+h1{font-size:clamp(30px,7vw,52px);margin:0;font-weight:900;letter-spacing:.04em}
+p{margin:0;max-width:34ch;line-height:1.6}
+#cards{display:grid;grid-template-columns:repeat(2,minmax(130px,170px));gap:12px}
+.card,.btn{font-family:inherit;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:22px;padding:14px 10px;cursor:pointer;font-size:15px;font-weight:900}
+.card:hover,.card:focus-visible,.btn:hover,.btn:focus-visible{border-color:var(--acc);outline:3px solid var(--acc)}
+.card small{display:block;font-weight:500;margin-top:4px;opacity:.8}
+.dots{display:flex;justify-content:center;gap:5px;margin-bottom:8px}
+.dots i{width:18px;height:18px;border-radius:50%;border:2px solid var(--line)}
+.btn{background:var(--acc);color:#2a2000;padding:12px 28px;font-size:17px}
+#joy,#jb,#hb{display:none;position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+#joy{left:24px;width:120px;height:120px;border-radius:50%;background:color-mix(in srgb,var(--card) 60%,transparent);border:2px solid var(--line)}
+#knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:var(--acc);pointer-events:none}
+#jb,#hb{right:24px;width:88px;height:88px;border-radius:50%;background:var(--acc);border:0;font:900 17px inherit;font-family:inherit;color:#2a2000;touch-action:none}#hb{right:122px;bottom:calc(env(safe-area-inset-bottom,0px) + 56px);width:78px;height:78px;background:#ff8fb1}
+@media (pointer:coarse),(max-width:760px){#joy,#jb,#hb{display:block}}
+#tip{position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:13px;opacity:.75;pointer-events:none}
+@media (pointer:coarse),(max-width:760px){#tip{display:none}}
+</style></head><body>
+<div id="c"></div>
+<div id="hud"><div id="sc">已收集 0／15</div><button id="chg">換角色</button></div>
+<div id="tip">方向鍵或 WASD 移動，空白鍵跳躍，J 鍵打樹</div>
+<div id="joy"><div id="knob"></div></div><button id="jb">跳躍</button><button id="hb">打樹</button>
+<div id="menu"><h1>檸檬島採集日記</h1><p>選一位角色，撿檸檬和星星，也可以打樹讓果實掉下來。</p><div id="cards"></div></div>
+<div id="win"><h1>全部收集完成！</h1><p id="wm"></p><button class="btn" id="again">再玩一次</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),T=THREE;
+const R=new T.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));$('#c').appendChild(R.domElement);
+const sc=new T.Scene();sc.background=new T.Color(0x9fe3ea);sc.fog=new T.Fog(0x9fe3ea,30,75);
+const cam=new T.PerspectiveCamera(50,1,.1,120);
+function rs(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.fov=cam.aspect<1?62:50;cam.updateProjectionMatrix()}
+addEventListener('resize',rs);rs();
+sc.add(new T.HemisphereLight(0xffffff,0x88b8a8,.9));
+const sun=new T.DirectionalLight(0xfff2d0,.7);sun.position.set(8,14,6);sc.add(sun);
+const M=c=>new T.MeshLambertMaterial({color:c});
+const S=(r,c,x=0,y=0,z=0,sx=1,sy=1,sz=1)=>{const m=new T.Mesh(new T.SphereGeometry(r,20,16),M(c));m.position.set(x,y,z);m.scale.set(sx,sy,sz);return m};
+const B=(w,h,d,c,x,y,z)=>{const m=new T.Mesh(new T.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);return m};
+const mesh=(g,c,x,y,z)=>{const m=new T.Mesh(g,M(c));m.position.set(x,y,z);sc.add(m);return m};
+let sd=7;const rnd=()=>(sd=sd*16807%2147483647)/2147483647;
+
+/* island */
+mesh(new T.CircleGeometry(90,40),0x4cc9d8,0,-.5,0).rotation.x=-Math.PI/2;
+mesh(new T.CylinderGeometry(17.5,18.5,1.4,48),0xf3dca0,0,-.7,0);
+mesh(new T.CylinderGeometry(15.5,16,.4,48),0x8fd16a,0,-.05,0);
+const trees=[];
+for(let i=0;i<14;i++){const a=rnd()*6.28,r=4+rnd()*10.5,x=Math.cos(a)*r,z=Math.sin(a)*r,g=new T.Group(),k=.8+rnd()*.5;
+ g.add(mesh(new T.CylinderGeometry(.2,.3,1.6,8),0x9c6b3f,0,.8,0));
+ g.add(S(1.1,0x4caf50,0,2.2,0),S(.8,0x66c25a,0,3,0));
+ g.children.forEach(c=>{if(c.parent!==g)return});
+ g.position.set(x,.15,z);g.scale.setScalar(k);
+ sc.add(g);trees.push({x,z,r:.8*k,g,stock:0,fr:[],sh:0})}
+const fc=[0xff8fb1,0xffffff,0xffe066];
+for(let i=0;i<60;i++){const a=rnd()*6.28,r=rnd()*15;sc.add(S(.12,fc[i%3],Math.cos(a)*r,.2,Math.sin(a)*r))}
+const clouds=[];
+for(let i=0;i<6;i++){const g=new T.Group();for(let j=0;j<3;j++)g.add(S(1.6-j*.2,0xffffff,j*1.6,0,j%2*.5,1,.6,.8));
+ g.position.set(-40+i*16,13+rnd()*4,-20-rnd()*25);sc.add(g);clouds.push(g)}
+
+/* characters */
+const CH=[
+ {n:'長髮女孩',d:'手機不離身',skin:0xffd2b0,top:0x2a2a2a,bot:0x4a7bd0,k:'long'},
+ {n:'檸檬頭',d:'一臉不爽的島主',skin:0xd9a066,top:0x8a5a35,bot:0x7a4e2c,k:'lemon'},
+ {n:'比基尼大叔',d:'平頭、海灘風',skin:0xf0b890,top:0xf0b890,bot:0xf0b890,sw:0x4fb0e8,k:'bikini'},
+ {n:'男孩',d:'憨憨的小幫手',skin:0xffd2b0,top:0x8cc8f0,bot:0x3d6fc0,k:'short'}];
+function build(o){
+ const g=new T.Group(),b=new T.Group();g.add(b);
+ b.add(S(.58,o.top,0,.8,0,o.k==='bikini'?1.12:1,1.05,.9));
+ const legs=[-1,1].map(s=>{const l=S(.22,o.bot,s*.26,.28,0,1,1.2,1);b.add(l);return l});
+ const arms=[-1,1].map(s=>{const a=S(.17,o.skin,s*.66,.85,0,1,1.3,1);b.add(a);return a});
+ const h=new T.Group();h.position.y=1.9;b.add(h);
+ const lem=o.k==='lemon';
+ h.add(lem?S(.82,0xffd23f,0,0,0,1,1.1,1):S(.78,o.skin));
+ [-1,1].forEach(s=>{h.add(S(.09,0x222222,s*.27,.05,.7,1,1.2,.8));h.add(S(.1,0xff9aa8,s*.46,-.2,.6,1,.6,.5))});
+ const mo=new T.Mesh(new T.TorusGeometry(.12,.028,8,12,Math.PI),M(0x5a2a2a));
+ mo.position.set(0,lem?-.3:-.2,.73);if(!lem)mo.rotation.z=Math.PI;h.add(mo);
+ if(lem){[-1,1].forEach(s=>{const br=B(.3,.07,.06,0x3a2a10,s*.27,.28,.76);br.rotation.z=s*-.5;h.add(br)});
+  h.add(S(.05,0x7a5a1a,0,.92,0,1,2,1));const lf=S(.3,0x4caf50,.3,1,0,1,.25,.55);lf.rotation.z=.4;h.add(lf)}
+ if(o.k==='long'){const hc=0x8a4b2a;h.add(S(.82,hc,0,.12,-.2,1,1,.95));[-1,1].forEach(s=>h.add(S(.28,hc,s*.68,-.55,-.1,.7,2.1,.8)));h.add(S(.8,hc,0,.2,.05,1,.55,.9))}
+ if(o.k==='bikini'){const sw=o.sw;h.add(S(.8,0x2a2018,0,.3,-.1,1,.75,.95),B(.78,.12,.78,0x2a2018,0,.85,-.05));[-1,1].forEach(s=>{b.add(S(.2,sw,s*.24,1.1,.5,1,.9,.7));const st=B(.05,.5,.05,sw,s*.3,1.4,.25);st.rotation.z=s*.25;b.add(st)});b.add(S(.6,sw,0,.42,0,1.05,.4,.95))}
+ if(o.k==='short'){h.add(S(.8,0x222222,0,.16,-.2,1,.95,1),S(.8,0x222222,0,.3,-.05,1,.45,.9))}
+ g.userData={b,legs,arms};return g}
+const P={x:0,z:3,y:0,vy:0,face:0,g:null,atk:0};let started=false,CHI=0;
+function pick(i){if(P.g)sc.remove(P.g);P.g=build(CH[i]);P.g.scale.setScalar(.9);sc.add(P.g);P.x=0;P.z=3;started=true;$('#menu').style.display='none';spawn()}
+$('#cards').innerHTML=CH.map((c,i)=>`<button class="card" data-i="${i}"><div class="dots"><i style="background:#${c.skin.toString(16).padStart(6,'0')}"></i><i style="background:#${(c.sw||c.top).toString(16).padStart(6,'0')}"></i><i style="background:#${c.bot.toString(16).padStart(6,'0')}"></i></div>${c.n}<small>${c.d}</small></button>`).join('');
+$('#cards').onclick=e=>{const c=e.target.closest('.card');if(c){CHI=+c.dataset.i;pick(CHI)}};
+$('#chg').onclick=()=>{started=false;$('#menu').style.display='flex'};
+$('#again').onclick=()=>{$('#win').style.display='none';spawn()};
+
+/* items */
+let items=[],got=0,score=0,TOTAL=0;
+function lemon(){const g=new T.Group(),b=S(.34,0xffd23f);b.scale.set(1.15,1,1);const l=S(.14,0x4caf50,.1,.36,0,1,.3,.6);l.rotation.z=.5;g.add(b,l);return g}
+function hud(){$('#sc').textContent=`已收集 ${got}／${TOTAL}　分數 ${score}`;const e=$('#sc');e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop')}
+function mk(star){return star?new T.Mesh(new T.OctahedronGeometry(.4),M(0xff8fb1)):lemon()}
+function fill(tr){tr.fr.forEach(f=>tr.g.remove(f));tr.fr=[];tr.stock=1+Math.floor(Math.random()*2);for(let i=0;i<tr.stock;i++){const f=lemon();f.scale.setScalar(1.2);f.position.set(Math.cos(i*3+1)*1.1,2.4+i*.5,Math.sin(i*3+1)*1.1);tr.g.add(f);tr.fr.push(f)}}
+function spawn(){items.forEach(i=>sc.remove(i.m));items=[];got=0;score=0;trees.forEach(fill);
+ for(let i=0;i<6;i++){const star=i>=4,m=mk(star);let x,z;
+  do{const a=Math.random()*6.28,r=2+Math.random()*12.5;x=Math.cos(a)*r;z=Math.sin(a)*r}while(trees.some(t=>Math.hypot(t.x-x,t.z-z)<t.r+.9));
+  m.position.set(x,.9,z);sc.add(m);items.push({m,p:star?3:1,ph:Math.random()*6,f:0})}TOTAL=6+trees.reduce((a,t)=>a+t.stock,0);hud()}
+
+/* input */
+const keys={};let jx=0,jz=0;
+function jump(){if(started&&P.y<=.001)P.vy=8}
+function hit(){if(!started||P.atk>0)return;P.atk=.35;let b=null,bd=9;trees.forEach(t=>{const d=Math.hypot(P.x-t.x,P.z-t.z)-t.r;if(d<bd){bd=d;b=t}});
+ if(!b||bd>1.8)return;P.face=Math.atan2(b.x-P.x,b.z-P.z);b.sh=.5;
+ if(b.stock>0){b.stock--;b.g.remove(b.fr.pop());const star=Math.random()<.3,m=mk(star),a=Math.random()*6.28,d=2+Math.random()*1.5;
+  let tx=b.x+Math.cos(a)*d,tz=b.z+Math.sin(a)*d;const r=Math.hypot(tx,tz);if(r>15){tx*=15/r;tz*=15/r}
+  m.position.set(b.x,3.2,b.z);sc.add(m);items.push({m,p:star?3:1,ph:0,f:1,vx:(tx-b.x)/.7,vz:(tz-b.z)/.7,vy:3})}}
+addEventListener('keydown',e=>{keys[e.code]=1;if(e.code==='Space'){jump();e.preventDefault()}if(e.code==='KeyJ'||e.code==='KeyF'||e.code==='Enter')hit();});
+addEventListener('keyup',e=>keys[e.code]=0);
+$('#jb').addEventListener('pointerdown',jump);$('#hb').addEventListener('pointerdown',hit);addEventListener('contextmenu',e=>e.preventDefault());
+const jy=$('#joy'),kn=$('#knob');let jid=null;
+function mv(e){const r=jy.getBoundingClientRect(),h=r.width/2;let x=e.clientX-r.left-h,y=e.clientY-r.top-h;const l=Math.hypot(x,y),m=Math.min(l,h*.6);if(l>0){x=x/l*m;y=y/l*m}kn.style.transform=`translate(${x}px,${y}px)`;jx=x/(h*.6);jz=y/(h*.6)}
+jy.addEventListener('pointerdown',e=>{jid=e.pointerId;jy.setPointerCapture(jid);mv(e)});
+jy.addEventListener('pointermove',e=>{if(e.pointerId===jid)mv(e)});
+const end=e=>{if(e.pointerId===jid){jid=null;jx=jz=0;kn.style.transform='none'}};
+jy.addEventListener('pointerup',end);jy.addEventListener('pointercancel',end);
+
+/* loop */
+const clk=new T.Clock();
+(function loop(){requestAnimationFrame(loop);
+ const dt=Math.min(clk.getDelta(),.05),t=clk.elapsedTime;
+ let dx=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+jx,dz=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)+jz;
+ const L=Math.hypot(dx,dz),moving=started&&L>.1;
+ if(P.g){
+  if(moving){if(L>1){dx/=L;dz/=L}P.x+=dx*5.5*dt;P.z+=dz*5.5*dt;
+   let d=Math.atan2(dx,dz)-P.face;d=Math.atan2(Math.sin(d),Math.cos(d));P.face+=d*Math.min(1,dt*14)}
+  const r=Math.hypot(P.x,P.z);if(r>15.2){P.x*=15.2/r;P.z*=15.2/r}
+  trees.forEach(tr=>{const ex=P.x-tr.x,ez=P.z-tr.z,dd=Math.hypot(ex,ez),m=tr.r+.5;if(dd<m){P.x=tr.x+ex/dd*m;P.z=tr.z+ez/dd*m}});
+  P.vy-=22*dt;P.y+=P.vy*dt;if(P.y<=0){P.y=0;P.vy=0}
+  P.g.position.set(P.x,.15+P.y,P.z);P.g.rotation.y=P.face;
+  const u=P.g.userData,w=moving&&P.y===0?1:0,s=Math.sin(t*12);
+  u.b.position.y=w?Math.abs(s)*.12:Math.sin(t*2)*.03;
+  u.legs[0].position.z=s*.22*w;u.legs[1].position.z=-s*.22*w;
+  u.arms[0].position.z=-s*.2*w;u.arms[1].position.z=s*.2*w;if(P.atk>0){P.atk-=dt;const q=Math.sin(Math.max(0,P.atk)/.35*Math.PI);u.arms[1].position.z=q*.8;u.arms[1].position.y=.85+q*.5}else u.arms[1].position.y=.85;trees.forEach(tr=>{if(tr.sh>0){tr.sh-=dt;tr.g.rotation.z=Math.sin(t*50)*.1*tr.sh}else tr.g.rotation.z=0});
+  items=items.filter(i=>{i.m.rotation.y=t*2;if(i.f){i.vy-=18*dt;i.m.position.x+=i.vx*dt;i.m.position.z+=i.vz*dt;i.m.position.y+=i.vy*dt;if(i.m.position.y<=.9&&i.vy<0){i.f=0;i.m.position.y=.9}}else i.m.position.y=.9+Math.sin(t*2+i.ph)*.15;
+   if(started&&!i.f&&Math.hypot(P.x-i.m.position.x,P.z-i.m.position.z)<1.2&&P.y<1.3){sc.remove(i.m);got++;score+=i.p;hud();
+    if(got===TOTAL){$('#wm').textContent=`你一共拿到 ${score} 分，島上又恢復了平靜。`;$('#win').style.display='flex'}return false}return true});
+  const pt=cam.aspect<1;cam.position.lerp(new T.Vector3(P.x,pt?12:9.5,P.z+(pt?14:11.5)),Math.min(1,dt*4));cam.lookAt(P.x,1,P.z)}
+ else{cam.position.set(Math.cos(t*.15)*26,12,Math.sin(t*.15)*26);cam.lookAt(0,0,0)}
+ if(!P.g)cam.lookAt(0,0,0);
+ clouds.forEach(c=>{c.position.x+=dt*.8;if(c.position.x>50)c.position.x=-50});
+ R.render(sc,cam)})();
+</script></body></html>
